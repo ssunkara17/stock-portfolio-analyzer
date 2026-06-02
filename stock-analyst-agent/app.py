@@ -127,8 +127,89 @@ def get_ai_insight(
         return f"• AI error: {e}"
 
 
+# ── Streamlit UI ───────────────────────────────────────────────────────────────
+
+def render_portfolio_section(tickers_shares: dict[str, float]) -> list[dict]:
+    holdings = []
+    rows = []
+    for ticker, shares in tickers_shares.items():
+        data = get_stock_data(ticker)
+        if not data:
+            continue
+        info = data["info"]
+        hist = data["hist"]
+        price = float(hist["Close"].iloc[-1])
+        hist_len = len(hist)
+        prev_close = float(
+            info.get("previousClose") or (hist["Close"].iloc[-2] if hist_len > 1 else price)
+        )
+        change_pct = (price - prev_close) / prev_close * 100 if prev_close else 0.0
+        mkt_cap = info.get("marketCap") or 0
+        volume = info.get("volume") or 0
+        holdings.append({"ticker": ticker, "shares": shares, "price": price, "prev_close": prev_close})
+        rows.append({
+            "Ticker": ticker,
+            "Shares": shares,
+            "Price": f"${price:.2f}",
+            "Day %": f"{change_pct:+.2f}%",
+            "Value": f"${price * shares:,.2f}",
+            "Mkt Cap": f"${mkt_cap / 1e9:.1f}B" if mkt_cap else "N/A",
+            "Volume": f"{volume:,}" if volume else "N/A",
+        })
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        summary = calculate_portfolio_summary(holdings)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Value", f"${summary['total_value']:,.2f}")
+        col2.metric(
+            "Day Gain/Loss",
+            f"${summary['day_gain']:,.2f}",
+            f"{summary['day_pct']:+.2f}%",
+        )
+        col3.metric("Positions", len(holdings))
+    else:
+        st.info("Enter valid tickers in the sidebar to see your portfolio.")
+    return holdings
+
+
 def main() -> None:
-    pass  # UI added in Tasks 4-7
+    st.set_page_config(page_title="Stock Analyst Agent", page_icon="📈", layout="wide")
+    st.title("📈 Stock Analyst Agent")
+
+    st.sidebar.header("My Portfolio")
+    raw_input = st.sidebar.text_area(
+        "Tickers & Shares (TICKER SHARES, one per line)",
+        value="AAPL 10\nMSFT 5\nGOOGL 3",
+        height=150,
+    )
+
+    tickers_shares: dict[str, float] = {}
+    for line in raw_input.strip().split("\n"):
+        parts = line.strip().split()
+        if len(parts) == 2:
+            try:
+                tickers_shares[parts[0].upper()] = float(parts[1])
+            except ValueError:
+                pass
+
+    tab1, tab2, tab3, tab4 = st.tabs(["Portfolio", "Analysis", "AI Insights", "Watchlist"])
+
+    with tab1:
+        st.subheader("Portfolio Overview")
+        holdings = render_portfolio_section(tickers_shares)
+
+    with tab2:
+        st.subheader("Stock Analysis")
+        st.info("Coming soon.")
+
+    with tab3:
+        st.subheader("AI Insights")
+        st.info("Coming soon.")
+
+    with tab4:
+        st.subheader("Watchlist")
+        st.info("Coming soon.")
 
 
 if __name__ == "__main__":
