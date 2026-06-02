@@ -175,6 +175,40 @@ def render_portfolio_section(tickers_shares: dict[str, float]) -> list[dict]:
     return holdings
 
 
+def render_stock_analysis(ticker: str) -> None:
+    data = get_stock_data(ticker)
+    if not data:
+        st.error(f"No data available for {ticker}")
+        return
+    info = data["info"]
+    hist = compute_moving_averages(data["hist"])
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], name="Price", line=dict(color="#1f77b4")))
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["MA50"], name="MA50", line=dict(color="orange", dash="dash")))
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["MA200"], name="MA200", line=dict(color="red", dash="dash")))
+    fig.update_layout(
+        title=f"{ticker} — 1-Year Price + Moving Averages",
+        xaxis_title="Date",
+        yaxis_title="Price (USD)",
+        height=420,
+        margin=dict(l=0, r=0, t=40, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    pe = info.get("trailingPE")
+    div_yield = info.get("dividendYield")
+    w52_low = info.get("fiftyTwoWeekLow", 0)
+    w52_high = info.get("fiftyTwoWeekHigh", 0)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("P/E Ratio", f"{pe:.1f}" if pe else "N/A")
+    col2.metric("Div Yield", f"{div_yield * 100:.2f}%" if div_yield else "0.00%")
+    col3.metric("52w Low", f"${w52_low:.2f}")
+    col4.metric("52w High", f"${w52_high:.2f}")
+
+
 def main() -> None:
     st.set_page_config(page_title="Stock Analyst Agent", page_icon="📈", layout="wide")
     st.title("📈 Stock Analyst Agent")
@@ -203,7 +237,12 @@ def main() -> None:
 
     with tab2:
         st.subheader("Stock Analysis")
-        st.info("Coming soon.")
+        ticker_list = list(tickers_shares.keys())
+        if ticker_list:
+            selected = st.selectbox("Select stock to analyze", ticker_list)
+            render_stock_analysis(selected)
+        else:
+            st.info("Add holdings in the sidebar first.")
 
     with tab3:
         st.subheader("AI Insights")
