@@ -91,8 +91,7 @@ def get_stock_data(ticker: str) -> dict | None:
         if hist.empty:
             return None
         return {"info": info, "hist": hist}
-    except Exception as e:
-        st.warning(f"Failed to fetch data for {ticker}: {e}")
+    except Exception:
         return None
 
 
@@ -135,13 +134,16 @@ def render_portfolio_section(tickers_shares: dict[str, float]) -> list[dict]:
     for ticker, shares in tickers_shares.items():
         data = get_stock_data(ticker)
         if not data:
+            st.warning(f"Could not fetch data for {ticker}. Check ticker symbol.")
             continue
         info = data["info"]
         hist = data["hist"]
         price = float(hist["Close"].iloc[-1])
         hist_len = len(hist)
+        prev_close_raw = info.get("previousClose")
         prev_close = float(
-            info.get("previousClose") or (hist["Close"].iloc[-2] if hist_len > 1 else price)
+            prev_close_raw if prev_close_raw is not None
+            else (hist["Close"].iloc[-2] if hist_len > 1 else price)
         )
         change_pct = (price - prev_close) / prev_close * 100 if prev_close else 0.0
         mkt_cap = info.get("marketCap") or 0
