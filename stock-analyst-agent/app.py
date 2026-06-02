@@ -11,7 +11,7 @@ from groq import Groq
 
 load_dotenv()
 
-WATCHLIST_FILE = Path("watchlist.json")
+WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
 GROQ_MODEL = "llama3-8b-8192"
 CACHE_TTL = 300
 
@@ -91,7 +91,8 @@ def get_stock_data(ticker: str) -> dict | None:
         if hist.empty:
             return None
         return {"info": info, "hist": hist}
-    except Exception:
+    except Exception as e:
+        st.warning(f"Failed to fetch data for {ticker}: {e}")
         return None
 
 
