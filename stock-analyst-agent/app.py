@@ -243,6 +243,76 @@ def render_ai_insights(ticker: str) -> None:
         st.code(build_ai_prompt(ticker, price, change_pct, pe, w52_low, w52_high, ma50, ma200))
 
 
+def render_watchlist_section() -> None:
+    watchlist = load_watchlist()
+    col1, col2 = st.columns([4, 1])
+    new_ticker = col1.text_input(
+        "Add ticker to watchlist", placeholder="e.g. TSLA", label_visibility="collapsed"
+    )
+    if col2.button("Add", use_container_width=True) and new_ticker.strip():
+        watchlist.append(new_ticker.strip().upper())
+        save_watchlist(watchlist)
+        st.rerun()
+
+    if not watchlist:
+        st.caption("Watchlist is empty. Add tickers above.")
+        return
+
+    for i, t in enumerate(watchlist):
+        col_t, col_p, col_r = st.columns([3, 3, 1])
+        col_t.write(f"**{t}**")
+        data = get_stock_data(t)
+        if data:
+            price = float(data["hist"]["Close"].iloc[-1])
+            col_p.write(f"${price:.2f}")
+        else:
+            col_p.write("N/A")
+        if col_r.button("✕", key=f"rm_{i}"):
+            watchlist.pop(i)
+            save_watchlist(watchlist)
+            st.rerun()
+
+
+def render_performance_metrics(holdings: list[dict]) -> None:
+    if not holdings:
+        st.info("Add holdings in the sidebar to see performance metrics.")
+        return
+
+    total_val = sum(h["price"] * h["shares"] for h in holdings)
+    rows = []
+    alloc_labels, alloc_values = [], []
+
+    for h in holdings:
+        data = get_stock_data(h["ticker"])
+        if not data:
+            continue
+        returns = calculate_returns(data["hist"])
+        val = h["price"] * h["shares"]
+        pct_alloc = val / total_val * 100 if total_val else 0.0
+        alloc_labels.append(h["ticker"])
+        alloc_values.append(val)
+        rows.append({
+            "Ticker": h["ticker"],
+            "Value": f"${val:,.2f}",
+            "Allocation": f"{pct_alloc:.1f}%",
+            "1D %": f"{returns['1d']:+.2f}%",
+            "1W %": f"{returns['1w']:+.2f}%",
+            "1M %": f"{returns['1m']:+.2f}%",
+        })
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    if alloc_labels:
+        fig = go.Figure(go.Pie(labels=alloc_labels, values=alloc_values, hole=0.4))
+        fig.update_layout(
+            title="Portfolio Allocation",
+            height=350,
+            margin=dict(l=0, r=0, t=40, b=0),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
 def main() -> None:
     st.set_page_config(page_title="Stock Analyst Agent", page_icon="📈", layout="wide")
     st.title("📈 Stock Analyst Agent")
@@ -268,6 +338,9 @@ def main() -> None:
     with tab1:
         st.subheader("Portfolio Overview")
         holdings = render_portfolio_section(tickers_shares)
+        st.divider()
+        st.subheader("Performance Metrics")
+        render_performance_metrics(holdings)
 
     with tab2:
         st.subheader("Stock Analysis")
@@ -291,7 +364,7 @@ def main() -> None:
 
     with tab4:
         st.subheader("Watchlist")
-        st.info("Coming soon.")
+        render_watchlist_section()
 
 
 if __name__ == "__main__":
