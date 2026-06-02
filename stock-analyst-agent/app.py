@@ -209,6 +209,40 @@ def render_stock_analysis(ticker: str) -> None:
     col4.metric("52w High", f"${w52_high:.2f}")
 
 
+def render_ai_insights(ticker: str) -> None:
+    data = get_stock_data(ticker)
+    if not data:
+        st.error(f"No data for {ticker}")
+        return
+    info = data["info"]
+    hist = compute_moving_averages(data["hist"])
+
+    price = float(hist["Close"].iloc[-1])
+    hist_len = len(hist["Close"])
+    prev_close_raw = info.get("previousClose")
+    prev_close = float(
+        prev_close_raw if prev_close_raw is not None
+        else (hist["Close"].iloc[-2] if hist_len > 1 else price)
+    )
+    change_pct = (price - prev_close) / prev_close * 100 if prev_close else 0.0
+    pe = float(info.get("trailingPE") or 0)
+    w52_low = float(info.get("fiftyTwoWeekLow") or 0)
+    w52_high = float(info.get("fiftyTwoWeekHigh") or 0)
+    ma50_val = hist["MA50"].iloc[-1]
+    ma200_val = hist["MA200"].iloc[-1]
+    ma50 = float(ma50_val) if not pd.isna(ma50_val) else 0.0
+    ma200 = float(ma200_val) if not pd.isna(ma200_val) else 0.0
+
+    st.caption(f"**{ticker}** — ${price:.2f} ({change_pct:+.2f}% today) — results cached 5 min")
+
+    with st.spinner("Asking Groq..."):
+        insight = get_ai_insight(ticker, price, change_pct, pe, w52_low, w52_high, ma50, ma200)
+    st.markdown(insight)
+
+    with st.expander("Prompt sent to Groq (~75 tokens)"):
+        st.code(build_ai_prompt(ticker, price, change_pct, pe, w52_low, w52_high, ma50, ma200))
+
+
 def main() -> None:
     st.set_page_config(page_title="Stock Analyst Agent", page_icon="📈", layout="wide")
     st.title("📈 Stock Analyst Agent")
@@ -246,7 +280,14 @@ def main() -> None:
 
     with tab3:
         st.subheader("AI Insights")
-        st.info("Coming soon.")
+        ticker_list = list(tickers_shares.keys())
+        if ticker_list:
+            selected_ai = st.selectbox("Select stock for AI analysis", ticker_list, key="ai_sel")
+            if st.button("Get AI Analysis", type="primary"):
+                render_ai_insights(selected_ai)
+            st.caption("Results cached for 5 minutes per ticker.")
+        else:
+            st.info("Add holdings in the sidebar first.")
 
     with tab4:
         st.subheader("Watchlist")
