@@ -35,3 +35,11 @@ def test_load_watchlist_handles_corrupt_json(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "WATCHLIST_FILE", wf)
     result = app.load_watchlist()
     assert result == []
+
+
+def test_save_watchlist_empty_list(tmp_path, monkeypatch):
+    import app
+    monkeypatch.setattr(app, "WATCHLIST_FILE", tmp_path / "watchlist.json")
+    app.save_watchlist([])
+    result = app.load_watchlist()
+    assert result == []

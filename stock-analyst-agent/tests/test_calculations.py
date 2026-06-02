@@ -11,7 +11,7 @@ def test_calculate_portfolio_summary_basic():
     result = calculate_portfolio_summary(holdings)
     assert result["total_value"] == pytest.approx(3000.0)
     assert result["day_gain"] == pytest.approx(45.0)
-    assert result["day_pct"] > 0
+    assert result["day_pct"] == pytest.approx(45.0 / 2955.0 * 100, rel=1e-3)
 
 
 def test_calculate_portfolio_summary_empty():
@@ -30,6 +30,7 @@ def test_calculate_returns_basic():
     current = 124.0
     assert result["1d"] == pytest.approx((current - 123.0) / 123.0 * 100)
     assert result["1w"] == pytest.approx((current - 119.0) / 119.0 * 100)
+    assert result["1m"] == pytest.approx((current - 103.0) / 103.0 * 100)
 
 
 def test_calculate_returns_empty():
